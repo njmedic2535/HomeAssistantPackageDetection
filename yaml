@@ -1,8 +1,8 @@
 blueprint:
-  name: AI Package Detector (Direct Camera Feed)
+  name: AI Package Detector (Official Camera URI)
   description: >
-    📦 AI Package Detector. Bypasses file path issues by sending 
-    the camera entities directly to the AI Task.
+    📦 AI Package Detector. Uses the formal media-source://camera/ URI 
+    to ensure the AI Task can resolve the images.
   domain: automation
   input:
     camera_entities:
@@ -73,20 +73,20 @@ action:
     then:
       - delay: "00:00:02"
 
-  # 1. Direct AI Task Call using camera entities
+  # 1. AI Task Call with the formal Camera URI
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Look at the live camera feeds provided. Count any delivery packages present.
+        Analyze the attached camera feeds. Count the number of delivery packages visible.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
-      # We pass the entities directly. The AI Task integration will take the snapshots for us.
+      # This uses the official camera media source provider
       attachments: >
         {% set ns = namespace(items=[]) %}
         {% for camera in camera_entities %}
-          {% set ns.items = ns.items + [{'media_content_id': camera, 'media_content_type': 'image/jpeg'}] %}
+          {% set ns.items = ns.items + [{'media_content_id': 'media-source://camera/' ~ camera, 'media_content_type': 'image/jpeg'}] %}
         {% endfor %}
         {{ ns.items }}
       structure:
@@ -98,13 +98,14 @@ action:
         message:
           selector:
             text:
+    # Storing the JSON response
     response_variable: ai_response
 
   - variables:
       count: "{{ ai_response.data.count | int(default=-1) }}"
       desc: "{{ ai_response.data.message }}"
 
-  # 2. Handle Logic & Notifications
+  # 2. Results & Notifications
   - choose:
       # NEW PACKAGE
       - conditions:
@@ -129,10 +130,10 @@ action:
               sequence:
                 - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
                   data:
-                    title: "📦 Package Picked Up"
+                    title: "📦 Package Removed"
                     message: "The porch is now clear."
 
-  # 3. Final Updates
+  # 3. Update State Helpers
   - if:
       - condition: template
         value_template: "{{ count != -1 }}"
