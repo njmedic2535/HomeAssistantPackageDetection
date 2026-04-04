@@ -1,8 +1,8 @@
 blueprint:
-  name: AI Package Detector (2026 Standard)
+  name: AI Package Detector (Official Media Path)
   description: >
-    📦 AI Package Detector using the modern ai_task.generate_data action.
-    This version uses structured output to eliminate parsing errors.
+    📦 AI Package Detector. Saves snapshots to /media/packages/ 
+    and uses the official media-source URI for AI Task resolution.
   domain: automation
   input:
     camera_entities:
@@ -13,7 +13,6 @@ blueprint:
           domain: camera
     ai_agent:
       name: AI Task Agent
-      description: Select your Google Generative AI Task entity (e.g., ai_task.google_gemini).
       selector:
         entity:
           domain: ai_task
@@ -47,11 +46,6 @@ blueprint:
       selector:
         entity:
           domain: input_number
-    previous_package_description_helper:
-      name: Package Description Helper (Internal)
-      selector:
-        entity:
-          domain: input_text
     package_status_helper:
       name: Package Status Helper
       selector:
@@ -61,7 +55,6 @@ blueprint:
 variables:
   camera_entities: !input camera_entities
   previous_package_count_helper: !input previous_package_count_helper
-  previous_package_description_helper: !input previous_package_description_helper
   package_status_helper: !input package_status_helper
 
 trigger:
@@ -74,14 +67,13 @@ trigger:
     id: motion_trigger
 
 action:
-  # 1. Handle Motion Delay
   - if:
       - condition: trigger
         id: motion_trigger
     then:
       - delay: "00:00:05"
 
-  # 2. Capture Snapshots
+  # 1. Take Snapshots to /media/packages/
   - parallel:
       - repeat:
           for_each: "{{ camera_entities }}"
@@ -90,43 +82,41 @@ action:
               data:
                 filename: >
                   {%- set camera_name = repeat.item | replace('camera.', '') | replace('.', '_') -%}
-                  /config/www/{{ camera_name }}_package.jpg
+                  /media/packages/{{ camera_name }}.jpg
               target:
                 entity_id: "{{ repeat.item }}"
 
   - delay: "00:00:02"
 
-  # 3. Call AI Task with Structured Output
+  # 2. Call AI Task using the media_source/packages path
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Determine the current package count at the door. 
+        Count delivery packages in the images.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
-        User Notes: {{ image_prompt_user_details }}
+        Context: {{ image_prompt_user_details }}
       attachments: >
         {% set ns = namespace(items=[]) %}
         {% for camera in camera_entities %}
           {% set camera_name = camera | replace('camera.', '') | replace('.', '_') %}
-          {% set ns.items = ns.items + [{'media_content_id': 'media-source://media_source/local/' ~ camera_name ~ '_package.jpg', 'media_content_type': 'image/jpeg'}] %}
+          {% set ns.items = ns.items + [{'media_content_id': 'media-source://media_source/packages/' ~ camera_name ~ '.jpg', 'media_content_type': 'image/jpeg'}] %}
         {% endfor %}
         {{ ns.items }}
       structure:
         count: "integer"
         message: "string"
-        best_image_path: "string"
+        best_image_name: "string"
     response_variable: ai_response
 
-  # 4. Map Response to Variables
   - variables:
       count: "{{ ai_response.data.count | int(default=-1) }}"
       desc: "{{ ai_response.data.message }}"
-      best_img: "{{ ai_response.data.best_image_path }}"
+      best_img: "{{ ai_response.data.best_image_name }}"
 
-  # 5. Process Logic & Notifications
+  # 3. Handle Results
   - choose:
-      # NEW PACKAGE
       - conditions:
           - condition: template
             value_template: "{{ count > (states(previous_package_count_helper) | int(0)) }}"
@@ -139,9 +129,13 @@ action:
                     title: "📦 New Package"
                     message: "{{ desc }}"
                     data:
-                      image: "{{ best_img | replace('media-source://media_source/local/', '/local/') if best_img else '' }}"
+                      # Note: Mobile apps cannot see /media/ directly. 
+                      # For notifications, it is better to use /local/ (www) if you want images.
+                      # If you want images in notifications, we'll need to copy the file to /config/www/
+                      attachment:
+                        url: "/media/local/packages/{{ best_img }}"
+                        content-type: jpeg
       
-      # PACKAGE REMOVED
       - conditions:
           - condition: template
             value_template: "{{ count < (states(previous_package_count_helper) | int(0)) and count >= 0 }}"
@@ -151,10 +145,10 @@ action:
               sequence:
                 - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
                   data:
-                    title: "📦 Package Picked Up"
+                    title: "📦 Package Removed"
                     message: "The porch is now clear."
 
-  # 6. Update State Helpers
+  # 4. Final Updates
   - if:
       - condition: template
         value_template: "{{ count != -1 }}"
