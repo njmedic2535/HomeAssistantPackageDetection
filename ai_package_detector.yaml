@@ -1,5 +1,5 @@
 blueprint:
-  name: AI Package Detector (Variable Fix)
+  name: AI Package Detector (Time Fix)
   description: >
     📦 AI Package Detector. Fixed the "undefined variable" error by properly
     mapping the user details input to a variable.
@@ -7,6 +7,8 @@ blueprint:
   input:
     camera_entities:
       name: Cameras
+      description: |-
+        Select the cameras monitoring your delivery area.
       selector:
         entity:
           multiple: true
@@ -17,7 +19,9 @@ blueprint:
         entity:
           domain: ai_task
     motion_sensor_entities:
-      name: Optional Motion Sensors
+      name: Motion Sensors
+      description: |-
+        Select motion sensors linked to the cameras. This triggers detection on motion.
       default: []
       selector:
         entity:
@@ -25,17 +29,21 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
-      default: "Focus on the area around the door and doormat."
+      description: |-
+        Provide details for the analysis (e.g. "Focus on the blue door and welcome mat.").
+      default: []
       selector:
         text:
           multiline: true
-    time_pattern_minutes:
-      name: Check Interval (Minutes)
-      default: "/15"
-      selector:
-        text:
+#    time_pattern_minutes:
+#      name: Check Interval (Minutes)
+#      default: "nul"
+#      selector:
+#        text:
     notification_target:
       name: Notification Target
+      description: >
+        Specify one or more targets for notifications.
       default: []
       selector:
         device:
@@ -43,11 +51,29 @@ blueprint:
           multiple: true
     previous_package_count_helper:
       name: Package Count Helper
+      description: |-
+        Select an input_number entity to store the last package count.
+        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
+      default: input_number.previous_package_count
       selector:
         entity:
           domain: input_number
+#    previous_package_description_helper:
+#      name: Package Description Helper (Internal)
+#      description: |-
+#        Select an input_text entity to store LLM context. Must be created with **max=255 characters** to avoid truncation.
+#        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
+#      default: input_text.previous_package_description
+#      selector:
+#        entity:
+#          domain: input_text          
     package_status_helper:
       name: Package Status Helper
+      description: |-
+        Select an input_boolean entity to track whether packages are waiting to be picked up.
+        Will be ON when packages are present, OFF when no packages are present.
+        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
+      default: input_boolean.packages_waiting
       selector:
         entity:
           domain: input_boolean
@@ -57,12 +83,13 @@ variables:
   camera_entities: !input camera_entities
   image_prompt_user_details: !input image_prompt_user_details
   previous_package_count_helper: !input previous_package_count_helper
+#  previous_package_description_helper: !input previous_package_description_helper
   package_status_helper: !input package_status_helper
 
 trigger:
-  - platform: time_pattern
-    minutes: !input time_pattern_minutes
-    id: time_trigger
+#  - platform: time_pattern
+#    minutes: !input time_pattern_minutes
+#    id: time_trigger
   - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
@@ -73,14 +100,14 @@ action:
       - condition: trigger
         id: motion_trigger
     then:
-      - delay: "00:00:02"
+      - delay: "00:00:05"
 
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Analyze the attached camera feeds. Count the number of delivery packages visible.
+        Analyze the attached camera feeds. Count the number of delivery packages visible with high certainty. Count MUST REFLECT ACTUAL packages visible now, not previous state. If you see no packages, count MUST be 0 regardless of previous count.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
       attachments: >
