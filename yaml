@@ -1,8 +1,8 @@
 blueprint:
-  name: AI Package Detector (Official Camera URI)
+  name: AI Package Detector (Variable Fix)
   description: >
-    📦 AI Package Detector. Uses the formal media-source://camera/ URI 
-    to ensure the AI Task can resolve the images.
+    📦 AI Package Detector. Fixed the "undefined variable" error by properly
+    mapping the user details input to a variable.
   domain: automation
   input:
     camera_entities:
@@ -53,7 +53,9 @@ blueprint:
           domain: input_boolean
 
 variables:
+  # THESE WERE MISSING - Mapping inputs to variables so the templates can see them
   camera_entities: !input camera_entities
+  image_prompt_user_details: !input image_prompt_user_details
   previous_package_count_helper: !input previous_package_count_helper
   package_status_helper: !input package_status_helper
 
@@ -73,7 +75,6 @@ action:
     then:
       - delay: "00:00:02"
 
-  # 1. AI Task Call with the formal Camera URI
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
@@ -82,7 +83,6 @@ action:
         Analyze the attached camera feeds. Count the number of delivery packages visible.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
-      # This uses the official camera media source provider
       attachments: >
         {% set ns = namespace(items=[]) %}
         {% for camera in camera_entities %}
@@ -98,14 +98,13 @@ action:
         message:
           selector:
             text:
-    # Storing the JSON response
     response_variable: ai_response
 
   - variables:
+      # Use .data to access the structured response from ai_task.generate_data
       count: "{{ ai_response.data.count | int(default=-1) }}"
       desc: "{{ ai_response.data.message }}"
 
-  # 2. Results & Notifications
   - choose:
       # NEW PACKAGE
       - conditions:
@@ -133,7 +132,6 @@ action:
                     title: "📦 Package Removed"
                     message: "The porch is now clear."
 
-  # 3. Update State Helpers
   - if:
       - condition: template
         value_template: "{{ count != -1 }}"
