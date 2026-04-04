@@ -1,8 +1,7 @@
 blueprint:
-  name: AI Package Detector (Official Media Path)
+  name: AI Package Detector (Final Schema Fix)
   description: >
-    📦 AI Package Detector. Saves snapshots to /media/packages/ 
-    and uses the official media-source URI for AI Task resolution.
+    📦 AI Package Detector. Fixed for the strict 2026 'structure' dictionary requirements.
   domain: automation
   input:
     camera_entities:
@@ -73,7 +72,7 @@ action:
     then:
       - delay: "00:00:05"
 
-  # 1. Take Snapshots to /media/packages/
+  # 1. Take Snapshots (Storing in /config/www/ for notification compatibility)
   - parallel:
       - repeat:
           for_each: "{{ camera_entities }}"
@@ -82,13 +81,13 @@ action:
               data:
                 filename: >
                   {%- set camera_name = repeat.item | replace('camera.', '') | replace('.', '_') -%}
-                  /media/packages/{{ camera_name }}.jpg
+                  /config/www/{{ camera_name }}_package.jpg
               target:
                 entity_id: "{{ repeat.item }}"
 
   - delay: "00:00:02"
 
-  # 2. Call AI Task using the media_source/packages path
+  # 2. Call AI Task with Corrected Dictionary Schema
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
@@ -101,22 +100,33 @@ action:
         {% set ns = namespace(items=[]) %}
         {% for camera in camera_entities %}
           {% set camera_name = camera | replace('camera.', '') | replace('.', '_') %}
-          {% set ns.items = ns.items + [{'media_content_id': 'media-source://media_source/packages/' ~ camera_name ~ '.jpg', 'media_content_type': 'image/jpeg'}] %}
+          {# Using direct local path resolution for attachments #}
+          {% set ns.items = ns.items + [{'media_content_id': 'media-source://media_source/local/' ~ camera_name ~ '_package.jpg', 'media_content_type': 'image/jpeg'}] %}
         {% endfor %}
         {{ ns.items }}
       structure:
-        count: "integer"
-        message: "string"
-        best_image_name: "string"
+        count:
+          selector:
+            number:
+              min: 0
+              max: 10
+        message:
+          selector:
+            text:
+        best_image_filename:
+          selector:
+            text:
     response_variable: ai_response
 
   - variables:
       count: "{{ ai_response.data.count | int(default=-1) }}"
       desc: "{{ ai_response.data.message }}"
-      best_img: "{{ ai_response.data.best_image_name }}"
+      # Strip any potential pathing AI might add to get just the filename
+      best_img: "{{ ai_response.data.best_image_filename | basename }}"
 
   # 3. Handle Results
   - choose:
+      # NEW PACKAGE
       - conditions:
           - condition: template
             value_template: "{{ count > (states(previous_package_count_helper) | int(0)) }}"
@@ -129,13 +139,9 @@ action:
                     title: "📦 New Package"
                     message: "{{ desc }}"
                     data:
-                      # Note: Mobile apps cannot see /media/ directly. 
-                      # For notifications, it is better to use /local/ (www) if you want images.
-                      # If you want images in notifications, we'll need to copy the file to /config/www/
-                      attachment:
-                        url: "/media/local/packages/{{ best_img }}"
-                        content-type: jpeg
+                      image: "/local/{{ best_img }}"
       
+      # PACKAGE REMOVED
       - conditions:
           - condition: template
             value_template: "{{ count < (states(previous_package_count_helper) | int(0)) and count >= 0 }}"
@@ -145,7 +151,7 @@ action:
               sequence:
                 - action: "notify.mobile_app_{{ device_attr(repeat.item, 'name') | slugify }}"
                   data:
-                    title: "📦 Package Removed"
+                    title: "📦 Package Picked Up"
                     message: "The porch is now clear."
 
   # 4. Final Updates
