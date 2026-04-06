@@ -1,14 +1,11 @@
 blueprint:
-  name: AI Package Detector (Time Fix)
+  name: AI Package Detector (Selectable Piper TTS)
   description: >
-    📦 AI Package Detector. Fixed the "undefined variable" error by properly
-    mapping the user details input to a variable.
+    📦 AI Package Detector with a selectable Piper TTS entity.
   domain: automation
   input:
     camera_entities:
       name: Cameras
-      description: |-
-        Select the cameras monitoring your delivery area.
       selector:
         entity:
           multiple: true
@@ -19,9 +16,7 @@ blueprint:
         entity:
           domain: ai_task
     motion_sensor_entities:
-      name: Motion Sensors
-      description: |-
-        Select motion sensors linked to the cameras. This triggers detection on motion.
+      name: Optional Motion Sensors
       default: []
       selector:
         entity:
@@ -29,67 +24,65 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
-      description: |-
-        Provide details for the analysis (e.g. "Focus on the blue door and welcome mat.").
-      default: []
+      default: "Focus on the area around the door and doormat."
       selector:
         text:
           multiline: true
-#    time_pattern_minutes:
-#      name: Check Interval (Minutes)
-#      default: "nul"
-#      selector:
-#        text:
+    time_pattern_minutes:
+      name: Check Interval (Minutes)
+      default: "/15"
+      selector:
+        text:
     notification_target:
       name: Notification Target
-      description: >
-        Specify one or more targets for notifications.
       default: []
       selector:
         device:
           integration: mobile_app
           multiple: true
+    # --- SELECTABLE PIPER INPUTS ---
+    tts_engine:
+      name: Piper TTS Entity
+      description: Select your Piper TTS entity (e.g., tts.piper).
+      selector:
+        entity:
+          domain: tts
+    tts_media_player:
+      name: TTS Media Player
+      description: Select the speaker for the announcement.
+      selector:
+        entity:
+          domain: media_player
+    tts_message:
+      name: TTS Custom Message
+      default: "A new package has been detected at the front door."
+      selector:
+        text:
+    # -------------------------------
     previous_package_count_helper:
       name: Package Count Helper
-      description: |-
-        Select an input_number entity to store the last package count.
-        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
-      default: input_number.previous_package_count
       selector:
         entity:
           domain: input_number
-#    previous_package_description_helper:
-#      name: Package Description Helper (Internal)
-#      description: |-
-#        Select an input_text entity to store LLM context. Must be created with **max=255 characters** to avoid truncation.
-#        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
-#      default: input_text.previous_package_description
-#      selector:
-#        entity:
-#          domain: input_text          
     package_status_helper:
       name: Package Status Helper
-      description: |-
-        Select an input_boolean entity to track whether packages are waiting to be picked up.
-        Will be ON when packages are present, OFF when no packages are present.
-        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
-      default: input_boolean.packages_waiting
       selector:
         entity:
           domain: input_boolean
 
 variables:
-  # THESE WERE MISSING - Mapping inputs to variables so the templates can see them
   camera_entities: !input camera_entities
   image_prompt_user_details: !input image_prompt_user_details
   previous_package_count_helper: !input previous_package_count_helper
-#  previous_package_description_helper: !input previous_package_description_helper
   package_status_helper: !input package_status_helper
+  tts_engine: !input tts_engine
+  tts_media_player: !input tts_media_player
+  tts_message: !input tts_message
 
 trigger:
-#  - platform: time_pattern
-#    minutes: !input time_pattern_minutes
-#    id: time_trigger
+  - platform: time_pattern
+    minutes: !input time_pattern_minutes
+    id: time_trigger
   - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
@@ -100,14 +93,14 @@ action:
       - condition: trigger
         id: motion_trigger
     then:
-      - delay: "00:00:05"
+      - delay: "00:00:02"
 
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Analyze the attached camera feeds. Count the number of delivery packages visible with high certainty. Count MUST REFLECT ACTUAL packages visible now, not previous state. If you see no packages, count MUST be 0 regardless of previous count.
+        Analyze the attached camera feeds. Count the number of delivery packages visible.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
       attachments: >
@@ -128,16 +121,23 @@ action:
     response_variable: ai_response
 
   - variables:
-      # Use .data to access the structured response from ai_task.generate_data
       count: "{{ ai_response.data.count | int(default=-1) }}"
       desc: "{{ ai_response.data.message }}"
 
   - choose:
-      # NEW PACKAGE
+      # NEW PACKAGE DETECTED
       - conditions:
           - condition: template
             value_template: "{{ count > (states(previous_package_count_helper) | int(0)) }}"
         sequence:
+          # --- PIPER TTS CALL ---
+          - action: tts.speak
+            target:
+              entity_id: "{{ tts_engine }}"
+            data:
+              media_player_entity_id: "{{ tts_media_player }}"
+              message: "{{ tts_message }}"
+          # ----------------------
           - repeat:
               for_each: !input notification_target
               sequence:
