@@ -24,15 +24,15 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
-      default: "Focus on the area around the door and doormat."
+      default: []
       selector:
         text:
           multiline: true
     time_pattern_minutes:
-      name: Check Interval (Minutes)
-      default: "/15"
-      selector:
-        text:
+#      name: Check Interval (Minutes)
+#      default: "/15"
+#      selector:
+#        text:
     notification_target:
       name: Notification Target
       default: []
@@ -80,9 +80,9 @@ variables:
   tts_message: !input tts_message
 
 trigger:
-  - platform: time_pattern
-    minutes: !input time_pattern_minutes
-    id: time_trigger
+#  - platform: time_pattern
+#    minutes: !input time_pattern_minutes
+#    id: time_trigger
   - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
@@ -100,7 +100,7 @@ action:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Analyze the attached camera feeds. Count the number of delivery packages visible.
+        Analyze the attached camera feeds. Count the number of delivery packages visible with high certainty. Include a brief decription of the packages if able. Count must include actual packages visible now, not previous state. If you see no packages, count must be 0 regardless of previous count.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
       attachments: >
