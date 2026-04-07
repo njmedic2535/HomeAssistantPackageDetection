@@ -24,7 +24,7 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
-      default: "Focus on the area around the door and doormat."
+      default: []
       selector:
         text:
 #          multiline: true#    time_pattern_minutes:
