@@ -11,7 +11,6 @@ blueprint:
       selector:
         entity:
           domain: ai_task
-    motion_sensor_entities:
     camera_entities:
       name: Cameras
       description: |-
@@ -20,6 +19,7 @@ blueprint:
         entity:
           multiple: true
           domain: camera
+    motion_sensor_entities:
     name: Motion Sensor
     description: |-
         Select motion sensors linked to the cameras. This triggers detection on motion.
