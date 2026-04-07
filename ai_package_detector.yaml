@@ -27,7 +27,7 @@ blueprint:
       default: "Focus on the area around the door and doormat."
       selector:
         text:
-          multiline: true#    time_pattern_minutes:
+#          multiline: true#    time_pattern_minutes:
 #      name: Check Interval (Minutes)
 #      default: "/15"
 #      selector:
