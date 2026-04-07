@@ -4,19 +4,25 @@ blueprint:
     📦 AI Package Detector with a selectable Piper TTS entity.
   domain: automation
   input:
-    camera_entities:
-      name: Cameras
-      selector:
-        entity:
-          multiple: true
-          domain: camera
-    ai_agent:
+  ai_agent:
       name: AI Task Agent
+      description: |-
+         Select the AI Agent that will analyze images.
       selector:
         entity:
           domain: ai_task
     motion_sensor_entities:
-      name: Optional Motion Sensors
+    camera_entities:
+      name: Cameras
+      description: |-
+        Select the cameras monitoring your delivery area.
+      selector:
+        entity:
+          multiple: true
+          domain: camera
+    name: Motion Sensor
+    description: |-
+        Select motion sensors linked to the cameras. This triggers detection on motion.
       default: []
       selector:
         entity:
@@ -24,23 +30,26 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
+      description: |-
+        Provide details for the analysis (e.g. "Focus on the blue door and welcome mat.").
       default: []
       selector:
         text:
           multiline: true
-    time_pattern_minutes:
+#    time_pattern_minutes:
 #      name: Check Interval (Minutes)
 #      default: "/15"
 #      selector:
 #        text:
     notification_target:
       name: Notification Target
+      description: >
+        Specify one or more targets (devices) for notifications.
       default: []
       selector:
         device:
           integration: mobile_app
           multiple: true
-    # --- SELECTABLE PIPER INPUTS ---
     tts_engine:
       name: Piper TTS Entity
       description: Select your Piper TTS entity (e.g., tts.piper).
@@ -58,7 +67,6 @@ blueprint:
       default: "A new package has been detected at the front door."
       selector:
         text:
-    # -------------------------------
     previous_package_count_helper:
       name: Package Count Helper
       selector:
@@ -80,6 +88,7 @@ variables:
   tts_message: !input tts_message
 
 trigger:
+# enable the time pattern if you have no limit on the AI API calls per day/etc.
 #  - platform: time_pattern
 #    minutes: !input time_pattern_minutes
 #    id: time_trigger
