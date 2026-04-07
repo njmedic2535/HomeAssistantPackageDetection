@@ -4,25 +4,19 @@ blueprint:
     📦 AI Package Detector with a selectable Piper TTS entity.
   domain: automation
   input:
-  ai_agent:
-      name: AI Task Agent
-      description: |-
-         Select the AI Agent that will analyze images.
-      selector:
-        entity:
-          domain: ai_task
     camera_entities:
       name: Cameras
-      description: |-
-        Select the cameras monitoring your delivery area.
       selector:
         entity:
           multiple: true
           domain: camera
+    ai_agent:
+      name: AI Task Agent
+      selector:
+        entity:
+          domain: ai_task
     motion_sensor_entities:
-    name: Motion Sensor
-    description: |-
-        Select motion sensors linked to the cameras. This triggers detection on motion.
+      name: Optional Motion Sensors
       default: []
       selector:
         entity:
@@ -30,13 +24,10 @@ blueprint:
           domain: binary_sensor
     image_prompt_user_details:
       name: Image Analysis Details
-      description: |-
-        Provide details for the analysis (e.g. "Focus on the blue door and welcome mat.").
-      default: []
+      default: "Focus on the area around the door and doormat."
       selector:
         text:
-          multiline: true
-#    time_pattern_minutes:
+          multiline: true#    time_pattern_minutes:
 #      name: Check Interval (Minutes)
 #      default: "/15"
 #      selector:
