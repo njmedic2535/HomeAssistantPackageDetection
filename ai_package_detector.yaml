@@ -38,14 +38,13 @@ blueprint:
       selector:
         text:
           multiline: true
-    time_of_day:
-      name: Time of Day
-      description: |-
-         Enter specific times of day to check for packages (24-hour time format).
+check_times:
+      name: Specific Times to Check
+      description: Select the specific times of day you want to trigger the check. 24-hour time format.
       default: []
       selector:
-        text:
-        multiple: true
+        time:
+          multiple: true
     time_pattern_minutes:
       name: Check Interval (Minutes)
       description: |-
@@ -112,9 +111,10 @@ trigger:
   - platform: time_pattern
     minutes: !input time_pattern_minutes
     id: time_trigger
-  - platform: time
-       at: time_of_day
-  - platform: state
+- platform: time
+    at: !input check_times
+    id: time_trigger
+    - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
     id: motion_trigger
