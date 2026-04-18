@@ -111,14 +111,14 @@ trigger:
   - platform: time_pattern
     minutes: !input time_pattern_minutes
     id: time_trigger
-- platform: time
+  - platform: time
     at: !input check_times
     id: time_trigger
-    - platform: state
+  - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
     id: motion_trigger
-
+    
 action:
   - if:
       - condition: trigger
