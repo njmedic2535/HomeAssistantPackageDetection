@@ -1,40 +1,61 @@
 blueprint:
-  name: AI Package Detector (Selectable Piper TTS)
+  name: AI Package Detector
   description: >
-    📦 AI Package Detector with a selectable Piper TTS entity.
+    📦🔍 AI Package Detector: I'm not a programmer. I'm just a middle-aged Nurse Anesthesiolgist who really wants to cancel his Nest Aware subscription.
+    Google bricked my 18-month old Pixel phone with a bad update and wouldn't do anything about it, so I'm on a mission to stop sending money to Alphabet.
+    I shamlessly used Gemini to figure out some of this code. Well, most of this code. Enjoy!
+    Credit to Dave Kneeland (https://gist.github.com/dkneeland/d1fe376871a5d40d93e3ae382622b369) for the original, which I've probably made a mess from.
   domain: automation
   input:
     camera_entities:
       name: Cameras
+      description: |-
+        Select the cameras monitoring your delivery area.
       selector:
         entity:
           multiple: true
           domain: camera
-    ai_agent:
-      name: AI Task Agent
-      selector:
-        entity:
-          domain: ai_task
     motion_sensor_entities:
-      name: Optional Motion Sensors
-      default: []
+      name: Motion Sensors
+      description: |-
+        Selecet the person or motion sensor linked to the cameras.
       selector:
         entity:
           multiple: true
           domain: binary_sensor
+    ai_agent:
+      name: AI Task Agent
+      description: |-
+        Select your AI Agent to process the task.
+      selector:
+        entity:
+          domain: ai_task         
     image_prompt_user_details:
       name: Image Analysis Details
+      description: |-
+        Provide details for the analysis (e.g. "Focus on the blue door and welcome mat.").
       default: []
       selector:
         text:
-#          multiline: true#    time_pattern_minutes:
-#      name: Check Interval (Minutes)
-#      default: "/15"
-#      selector:
-#        text:
+          multiline: true
+    time_of_day:
+      name: Time of Day
+      description: |-
+         Enter specific times of day to check for packages (24-hour time format).
+      default: []
+      selector:
+        text:
+        multiple: true
+    time_pattern_minutes:
+      name: Check Interval (Minutes)
+      description: |-
+        Only use the Time Interval if you do not have a limit on calls to your AI Agent!
+      default: nul
+      selector:
+        text:
     notification_target:
       name: Notification Target
-      description: >
+      description: |-
         Specify one or more targets (devices) for notifications.
       default: []
       selector:
@@ -42,8 +63,8 @@ blueprint:
           integration: mobile_app
           multiple: true
     tts_engine:
-      name: Piper TTS Entity
-      description: Select your Piper TTS entity (e.g., tts.piper).
+      name: TTS Entity
+      description: Select your TTS entity (e.g., tts.piper).
       selector:
         entity:
           domain: tts
@@ -60,11 +81,20 @@ blueprint:
         text:
     previous_package_count_helper:
       name: Package Count Helper
+      description: |-
+        Select an input_number entity to store the last package count.
+        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
+      default: input_number.previous_package_count
       selector:
         entity:
           domain: input_number
     package_status_helper:
       name: Package Status Helper
+      description: |-
+        Select an input_boolean entity to track whether packages are waiting to be picked up.
+        Will be ON when packages are present, OFF when no packages are present.
+        Create via Helpers: https://my.home-assistant.io/redirect/helpers/
+      default: input_boolean.packages_waiting
       selector:
         entity:
           domain: input_boolean
@@ -79,10 +109,11 @@ variables:
   tts_message: !input tts_message
 
 trigger:
-# enable the time pattern if you have no limit on the AI API calls per day/etc.
-#  - platform: time_pattern
-#    minutes: !input time_pattern_minutes
-#    id: time_trigger
+  - platform: time_pattern
+    minutes: !input time_pattern_minutes
+    id: time_trigger
+  - platform: time
+       at: time_of_day
   - platform: state
     entity_id: !input motion_sensor_entities
     to: "on"
@@ -93,14 +124,19 @@ action:
       - condition: trigger
         id: motion_trigger
     then:
-      - delay: "00:00:02"
+      - delay: "00:00:30"
 
   - action: ai_task.generate_data
     data:
       entity_id: !input ai_agent
       task_name: "package_check"
       instructions: >
-        Analyze the attached camera feeds. Count the number of delivery packages visible with high certainty. Include a brief decription of the packages if able. Count must include actual packages visible now, not previous state. If you see no packages, count must be 0 regardless of previous count.
+        Analyze the attached camera feeds. Count the number of delivery packages visible with high certainty. 
+        Only report a package if you're absolutely certain it's a delivery package (boxes, envelopes, etc).
+        Include a brief decription of the packages if able. 
+        Count must include actual packages visible now, not previous state.
+        If a person is holding a package, wait one minute and analyze the feed again.
+        If you see no packages, count must be 0 regardless of previous count.
         Previous count: {{ states(previous_package_count_helper)|int(0) }}
         User Notes: {{ image_prompt_user_details }}
       attachments: >
