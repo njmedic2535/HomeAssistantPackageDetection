@@ -38,7 +38,7 @@ blueprint:
       selector:
         text:
           multiline: true
-check_times:
+    check_times:
       name: Specific Times to Check
       description: Select the specific times of day you want to trigger the check. 24-hour time format.
       default: []
