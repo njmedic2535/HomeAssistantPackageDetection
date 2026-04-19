@@ -48,7 +48,7 @@ blueprint:
       name: Check Interval (Minutes)
       description: |-
         Only use the Time Interval if you do not have a limit on calls to your AI Agent!
-      default: nul
+      default: []
       selector:
         text:
     notification_target:
