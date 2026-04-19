@@ -40,10 +40,10 @@ blueprint:
           multiline: true
     check_times:
       name: Specific Times to Check
-      description: Select the specific times of day you want to trigger the check.
-      default: []
+      description: Enter times separated by commas (e.g., 09:00, 12:00, 17:00).
+      default: ""
       selector:
-        time: {}
+        text:
     time_pattern_minutes:
       name: Check Interval (Minutes)
       description: |-
@@ -111,7 +111,7 @@ trigger:
     minutes: !input time_pattern_minutes
     id: time_trigger
   - platform: time
-    at: !input check_times
+    at: "{{ state_attr('automation.ai_package_detector', 'check_times').split(',') | map('trim') | list }}"
     id: time_trigger
   - platform: state
     entity_id: !input motion_sensor_entities
